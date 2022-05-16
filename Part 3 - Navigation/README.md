@@ -2,7 +2,7 @@
 
 In Part 3 we will add simple navigation to push a new page onto the stack to display details about the monkey.
 
-We will use the built-in Shell navigation of .NET MAUI. This powerful navigation system is based on URIs. You can pass additional information while navigating query paramater such as a string, or a full object.
+We will use the built-in Shell navigation of .NET MAUI. This powerful navigation system is based on URIs. You can pass additional information while navigating query parameter such as a string, or a full object.
 
 For example, let's say we wanted to navigate to a details page and pass in an identifier. 
 
@@ -10,7 +10,7 @@ For example, let's say we wanted to navigate to a details page and pass in an id
 await Shell.Current.GoToAsync("DetailsPage?name=james");
 ```
 
-Then in our details page or view model we sould define this property:
+Then in our details page or view model we should define this property:
 
 ```csharp
 [QueryProperty(nameof(Name), "name")]
@@ -58,6 +58,25 @@ Now, let's add a click handler to the collection view and pass the monkey to the
 
 Now, let's add navigation to a second page that displays monkey details!
 
+1. In `MonkeysViewModel.cs`, create a method `async Task GoToDetailsAsync(Monkey monkey)` exposed as an `[ICommand]`:
+
+
+    ```csharp
+    [ICommand]
+    async Task GoToDetails(Monkey monkey)
+    {
+        if (monkey == null)
+	    return;
+
+        await Shell.Current.GoToAsync(nameof(DetailsPage), true, new Dictionary<string, object>
+        {
+            {"Monkey", monkey }
+        });
+    }
+    ```
+
+    - This code checks to see if the selected item is non-null and then uses the built in Shell `Navigation` API to push a new page with the monkey as a parameter and then deselects the item. 
+
 1. In `MainPage.xaml` we can add an `TapGestureRecognizer` event to the `Frame` of our monkey inside of the `CollectionView.ItemTemplate`:
 
     Before:
@@ -73,13 +92,12 @@ Now, let's add navigation to a second page that displays monkey details!
                             HeightRequest="125"
                             Source="{Binding Image}"
                             WidthRequest="125" />
-                        <StackLayout
+                        <VerticalStackLayout
                             Grid.Column="1"
-                            Padding="10"
-                            VerticalOptions="Center">
+                            Padding="10">
                             <Label Style="{StaticResource LargeLabel}" Text="{Binding Name}" />
                             <Label Style="{StaticResource MediumLabel}" Text="{Binding Location}" />
-                        </StackLayout>
+                        </VerticalStackLayout>
                     </Grid>
                 </Frame>
             </Grid>
@@ -95,7 +113,9 @@ Now, let's add navigation to a second page that displays monkey details!
                 <Frame HeightRequest="125" Style="{StaticResource CardView}">
                     <!-- Add the Gesture Recognizer-->
                     <Frame.GestureRecognizers>
-                        <TapGestureRecognizer Tapped="TapGestureRecognizer_Tapped"/>
+                        <TapGestureRecognizer 
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodel:MonkeysViewModel}}, Path=GoToDetailsCommand}"
+                                CommandParameter="{Binding .}"/>
                     </Frame.GestureRecognizers>
                     <Grid Padding="0" ColumnDefinitions="125,*">
                         <Image
@@ -103,13 +123,12 @@ Now, let's add navigation to a second page that displays monkey details!
                             HeightRequest="125"
                             Source="{Binding Image}"
                             WidthRequest="125" />
-                        <StackLayout
+                        <VerticalStackLayout
                             Grid.Column="1"
-                            Padding="10"
-                            VerticalOptions="Center">
+                            Padding="10">
                             <Label Style="{StaticResource LargeLabel}" Text="{Binding Name}" />
                             <Label Style="{StaticResource MediumLabel}" Text="{Binding Location}" />
-                        </StackLayout>
+                        </VerticalStackLayout>
                     </Grid>
                 </Frame>
             </Grid>
@@ -117,26 +136,8 @@ Now, let's add navigation to a second page that displays monkey details!
     </CollectionView.ItemTemplate>
     ```
 
+    This uses a `RelativeSource` binding, which means that it isn't binding to the `Monkey` anymore in the `DataTemplate`, but instead it is looking up the hierarchy specifically for an `AncestorType` of `MonkeysViewModel`. This allows for more advanced scenarios like this.
 
-1. In `MainPage.xaml.cs`, create a method called `TapGestureRecognizer_Tapped`:
-
-
-    ```csharp
-    private async void TapGestureRecognizer_Tapped(object sender, EventArgs e)
-    {
-		var monkey = ((VisualElement)sender).BindingContext as Monkey;        
-        
-		if (monkey == null)
-			return;
-
-		await Shell.Current.GoToAsync(nameof(DetailsPage), true, new Dictionary<string, object>
-		{
-			{"Monkey", monkey }
-		});
-	}
-    ```
-
-    - This code checks to see if the selected item is non-null and then uses the built in Shell `Navigation` API to push a new page with the monkey as a parameter and then deselects the item. 
 
 ### ViewModel for Details
 
@@ -168,6 +169,36 @@ Now, let's add navigation to a second page that displays monkey details!
         [ObservableProperty]
         Monkey monkey;
     }
+    ```
+    
+    
+## Registering Routing
+
+Now that we have our details page in place, we need to register it for routing. This is done in both the Shell routing system and with the .NET MAUI dependency service.
+
+1. Open `AppShell.xaml.cs` code behind and add the following code into the constructor under the `InitializeComponent();` invoke:
+
+    ```csharp
+    Routing.RegisterRoute(nameof(DetailsPage), typeof(DetailsPage));
+    ```
+
+    This will register the details page with the route of "DetailsPage", which we used earlier.
+
+1. Open `MauiProgram.cs` and add both the view model and the page as `Transient` so a new page and view model is created each time it is navigated to:
+
+    ```csharp
+    builder.Services.AddTransient<MonkeyDetailsViewModel>();
+    builder.Services.AddTransient<DetailsPage>();
+    ```
+
+1. Finally, we must inject the view model into our `DetailsPage`. Open the code behind for the page in `DetailsPage.xaml.cs` and change the constructor to the following:
+
+    ```csharp
+	public DetailsPage(MonkeyDetailsViewModel viewModel)
+	{
+		InitializeComponent();
+		BindingContext = viewModel;
+	}
     ```
 
 ### Create DetailsPage.xaml UI
@@ -247,34 +278,6 @@ Let's add UI to the DetailsPage. Our end goal is to get a fancy profile screen l
 </VerticalStackLayout>
 ```
 
-## Registering Routing
-
-Now that we have our details page in place we need to register it for routing. This is done in both the Shell routing system and with the .NET MAUI dependency service.
-
-1. Open `AppShell.xaml.cs` code behind and add the following code into the constructor under the `InitializeComponent();` invoke:
-
-    ```csharp
-    Routing.RegisterRoute(nameof(DetailsPage), typeof(DetailsPage));
-    ```
-
-    This will register the details page with the route of "DetailsPage", which we used earlier.
-
-1. Open `MauiProgram.cs` and add  both the view model and the page as `Transient` so a new page and view model is created each time it is navigated to:
-
-    ```csharp
-    builder.Services.AddTransient<MonkeyDetailsViewModel>();
-    builder.Services.AddTransient<DetailsPage>();
-    ```
-
-1. Finally, we must inject the view model into our `DetailsPage`. Open the code behind for the page in `DetailsPage.xaml.cs` and change the constructor to the following:
-
-    ```csharp
-	public DetailsPage(MonkeyDetailsViewModel viewModel)
-	{
-		InitializeComponent();
-		BindingContext = viewModel;
-	}
-    ```
 
 1. Run the application on the desired platform and tap on a monkey to navigate!
 

@@ -11,6 +11,18 @@ public partial class MonkeysViewModel : BaseViewModel
         Title = "Monkey Finder";
         this.monkeyService = monkeyService;
     }
+    
+    [ICommand]
+    async Task GoToDetails(Monkey monkey)
+    {
+        if (monkey == null)
+        return;
+
+        await Shell.Current.GoToAsync(nameof(DetailsPage), true, new Dictionary<string, object>
+        {
+            {"Monkey", monkey }
+        });
+    }
 
     [ICommand]
     async Task GetMonkeysAsync()
@@ -33,7 +45,7 @@ public partial class MonkeysViewModel : BaseViewModel
         catch (Exception ex)
         {
             Debug.WriteLine($"Unable to get monkeys: {ex.Message}");
-            await Application.Current.MainPage.DisplayAlert("Error!", ex.Message, "OK");
+            await Shell.Current.DisplayAlert("Error!", ex.Message, "OK");
         }
         finally
         {

@@ -6,12 +6,26 @@ public partial class MonkeysViewModel : BaseViewModel
 {
     public ObservableCollection<Monkey> Monkeys { get; } = new();
     MonkeyService monkeyService;
+    IConnectivity connectivity;
     IGeolocation geolocation;
-    public MonkeysViewModel(MonkeyService monkeyService, IGeolocation geolocation)
+    public MonkeysViewModel(MonkeyService monkeyService, IConnectivity connectivity, IGeolocation geolocation)
     {
         Title = "Monkey Finder";
         this.monkeyService = monkeyService;
+        this.connectivity = connectivity;
         this.geolocation = geolocation;
+    }
+    
+    [ICommand]
+    async Task GoToDetails(Monkey monkey)
+    {
+        if (monkey == null)
+        return;
+
+        await Shell.Current.GoToAsync(nameof(DetailsPage), true, new Dictionary<string, object>
+        {
+            {"Monkey", monkey }
+        });
     }
 
     [ObservableProperty]
@@ -25,6 +39,13 @@ public partial class MonkeysViewModel : BaseViewModel
 
         try
         {
+            if (connectivity.NetworkAccess != NetworkAccess.Internet)
+            {
+                await Shell.Current.DisplayAlert("No connectivity!",
+                    $"Please check internet and try again.", "OK");
+                return;
+            }
+
             IsBusy = true;
             var monkeys = await monkeyService.GetMonkeys();
 
@@ -38,7 +59,7 @@ public partial class MonkeysViewModel : BaseViewModel
         catch (Exception ex)
         {
             Debug.WriteLine($"Unable to get monkeys: {ex.Message}");
-            await Application.Current.MainPage.DisplayAlert("Error!", ex.Message, "OK");
+            await Shell.Current.DisplayAlert("Error!", ex.Message, "OK");
         }
         finally
         {
@@ -72,14 +93,14 @@ public partial class MonkeysViewModel : BaseViewModel
                 new Location(m.Latitude, m.Longitude), DistanceUnits.Miles))
                 .FirstOrDefault();
 
-            await Application.Current.MainPage.DisplayAlert("", first.Name + " " +
+            await Shell.Current.DisplayAlert("", first.Name + " " +
                 first.Location, "OK");
 
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"Unable to query location: {ex.Message}");
-            await Application.Current.MainPage.DisplayAlert("Error!", ex.Message, "OK");
+            await Shell.Current.DisplayAlert("Error!", ex.Message, "OK");
         }
     }
 }
